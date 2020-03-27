@@ -1,0 +1,398 @@
+<!doctype html>
+<html>
+<head>
+  <title>Kalambury - charades for everyone</title>
+  <style>
+    html,
+    body {
+      height: 100%;
+    }
+
+    .name {
+      z-index: 999;
+    }
+
+    .h-10 {
+      height: 10%;
+    }
+
+    .h-90 {
+      height: 90%;
+    }
+
+    .h-65 {
+      height: 65%;
+    }
+
+    .mh-65 {
+      max-height: 65%;
+    }
+
+    .username {
+      font-weight: bold;
+    }
+
+    .bottom {
+      bottom: 0;
+    }
+
+    .message {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      padding: 15px;
+      line-height: 1;
+      display: block;
+      border: 0;
+      box-shadow: none;
+    }
+
+    .message:focus {
+      box-shadow: none;
+    }
+
+    .las {
+      font-size: 3rem;
+    }
+
+    canvas {
+      position: fixed;
+      bottom: 10px;
+    }
+  </style>
+  <link rel="shortcut icon" href="https://cdn3.iconfinder.com/data/icons/letters-and-numbers-1/32/letter_K_blue-512.png" type="image/x-icon">
+  <link rel="stylesheet"
+    href="https://maxst.icons8.com/vue-static/landings/line-awesome/line-awesome/1.3.0/css/line-awesome.min.css">
+  <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css" rel="stylesheet"
+    integrity="sha384-Vkoo8x4CGsO3+Hhxv8T/Q5PaXtkKtu6ug5TOeNV6gBiFeWPGFN9MuhOf23Q9Ifjh" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@simonwep/pickr/dist/themes/nano.min.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@simonwep/pickr/dist/pickr.min.js"></script>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js"
+    integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN" crossorigin="anonymous">
+  </script>
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js"
+    integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous">
+  </script>
+
+
+  <script>
+    window.addEventListener("load", function () {
+      const paintBar = document.querySelector(".paintbar");
+      const paintArea = document.querySelector(".paint");
+      const points = document.querySelector(".points");
+      const password = document.querySelector(".password");
+      const textarea = document.querySelector(".message");
+      const chat = document.querySelector(".messages");
+      const timer = document.querySelector(".time");
+      const trash = document.querySelector(".la-trash");
+      const brushRange = document.querySelector("#brushSize");
+      const canvas = document.querySelector("#canvas");
+      const ctx = canvas.getContext("2d");
+      var socket = io();
+      let username;
+      let painting = false;
+      let strokeColor = "#000000";
+      let lineCap = "round";
+      let brushSize = 3;
+      let formSubmit = document.querySelector(".play");
+      let width = parseFloat(getComputedStyle(paintArea).width);
+      let height = parseFloat(getComputedStyle(paintArea).height);
+      let pbHeight = parseFloat(getComputedStyle(paintBar).height);
+
+      canvas.width = width - 50;
+      canvas.height = height - pbHeight - 60;
+      ctx.lineWidth = 2;
+      window.addEventListener("resize", function () {
+        width = parseFloat(getComputedStyle(paintArea).width);
+        height = parseFloat(getComputedStyle(paintArea).height);
+        pbHeight = parseFloat(getComputedStyle(paintBar).height);
+        canvas.width = width - 50;
+        canvas.height = height - pbHeight - 50;
+      });
+
+      function changeBrushSize() {
+        brushSize = brushRange.value;
+      }
+      brushRange.addEventListener("change", changeBrushSize);
+
+      function startPainting(e) {
+        painting = true;
+        draw(e);
+      }
+
+      function stopPainting(e) {
+        painting = false;
+        socket.emit('canvasStopDrawing', e.clientX - canvas.offsetLeft, e.clientY - canvas.offsetTop, window
+          .innerWidth, window.innerHeight, painting, strokeColor, brushSize, lineCap);
+        ctx.beginPath();
+      }
+
+      function draw(e) {
+
+        if (!painting) return;
+        ctx.lineWidth = brushSize;
+
+        socket.emit('canvasDrawing', e.clientX - canvas.offsetLeft, e.clientY - canvas.offsetTop, window.innerWidth,
+          window.innerHeight, painting, strokeColor, brushSize, lineCap)
+        ctx.lineTo(e.clientX - canvas.offsetLeft, e.clientY - canvas.offsetTop);
+        ctx.lineCap = lineCap;
+        ctx.strokeStyle = strokeColor;
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(e.clientX - canvas.offsetLeft, e.clientY - canvas.offsetTop);
+      }
+
+      function cleanCanvas() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        socket.emit('clearCanvas', true);
+      }
+
+      function sendMessage() {
+        if (event.keyCode == 13 && textarea.value != '') {
+          
+          socket.emit('password', textarea.value.toLowerCase());
+          message = `<span class="username">${username}</span>: ${textarea.value}`;
+          socket.emit('message', message);
+          textarea.value = '';
+        }
+      };
+
+      function loadPaintBar(pwd) {
+        paintBar.classList.add("d-flex");
+        paintBar.classList.remove("d-none");
+        password.innerText = pwd;
+        canvas.addEventListener("mousedown", startPainting);
+        canvas.addEventListener("mouseup", stopPainting)
+        canvas.addEventListener("mouseout", stopPainting)
+        canvas.addEventListener("mousemove", draw);
+
+      }
+
+      function disablePaintBar() {
+        paintBar.classList.remove("d-flex");
+        paintBar.classList.add("d-none");
+        canvas.removeEventListener("mousedown", startPainting);
+        canvas.removeEventListener("mouseup", stopPainting)
+        canvas.removeEventListener("mouseout", stopPainting)
+        canvas.removeEventListener("mousemove", draw);
+
+      }
+
+      function disableChat() {
+        textarea.disabled = true;
+        textarea.removeEventListener("keyup", sendMessage);
+      }
+
+      function enableChat() {
+        textarea.disabled = false;
+        textarea.addEventListener("keyup", sendMessage);
+      }
+
+      function joinGame() {
+        event.preventDefault();
+        username = document.querySelector("#name").value;
+        if (username == '') return;
+        socket.emit('username', username);
+        document.querySelector(".name").classList.remove("d-flex");
+        document.querySelector(".name").classList.add("d-none");
+        return false;
+      }
+      const pickr = Pickr.create({
+        el: '.color',
+        theme: 'nano', // or 'monolith', or 'nano'
+
+        swatches: [
+          'rgba(255,0,0, 1)',
+          'rgba(0,255,0, 1)',
+          'rgba(0,0,255, 1)',
+          'rgba(255,0,255, 1)',
+          'rgba(255,255,0, 1)',
+          'rgba(0,255,255, 1)',
+          'rgba(255,255,255, 1)',
+          'rgba(0,0,0, 1)'
+        ],
+        position: 'bottom-middle',
+        default: '#000000',
+        components: {
+          // Main components
+          preview: true,
+          hue: true,
+          // Input / output Options
+          interaction: {
+            save: true
+          },
+        },
+        strings: {
+          save: 'Zapisz'
+        }
+      });
+      pickr.on('init', instance => {
+      }).on('save', color => {
+        pickr.hide();
+        strokeColor = color.toHEXA().toString();
+      })
+
+      socket.on('winner', function(winner, pass)
+      {
+        chat.innerHTML = `<div class="row w-100 bg-success"><div class="col col-sm-12"><p>Wygrywa ${winner}. Hasło to ${pass}</p></div></div>`;
+      })
+      socket.on('canvasPause', function () {
+        ctx.beginPath();
+      });
+
+      socket.on('disablePaintBar', function (msg) {
+        disablePaintBar();
+        enableChat();
+      })
+      socket.on('message', function (msg) {
+        chat.innerHTML += `<div class="row w-100"><div class="col col-sm-12"><p>${msg}</p></div></div>`;
+        chat.scrollTop = chat.scrollHeight;
+      });
+
+
+      socket.on("chosenOne", function (password) {
+        loadPaintBar(password);
+        disableChat();
+      });
+      socket.on('newPlayer', function (player) {
+        points.innerHTML += `<tr>
+               <td>${player.name}</td>
+               <td>${player.points}</td>
+             </tr>`;
+
+      })
+      socket.on('timer', function (time) {
+        timer.innerText = time;
+      })
+      socket.on('allUsers', function (usersArr) {
+        points.innerHTML = '';
+        usersArr.forEach(function (user) {
+          points.innerHTML += `<tr>
+               <td>${user.name}</td>
+               <td>${user.points}</td>
+             </tr>`;
+        });
+      });
+
+      socket.on('drawHistory', function (dH) {
+        dH.forEach(function (line) {
+          ctx.lineCap = line.l;
+          if (!line.p) {
+            ctx.beginPath();
+            return;
+          };
+          arX = window.innerWidth / line.w;
+          arY = window.innerHeight / line.h;
+          ctx.strokeStyle = line.c;
+          ctx.lineWidth = line.b;
+          ctx.lineTo(line.x * arX, line.y * arY);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(line.x * arX, line.y * arY);
+        })
+      })
+      socket.on('canvasPosition', function (x, y, w, h, p, c, b, l) {
+        if (!p) return;
+        arX = window.innerWidth / w;
+        arY = window.innerHeight / h;
+        ctx.lineCap = l;
+        ctx.lineWidth = b;
+        ctx.lineTo(x * arX, y * arY);
+        ctx.stroke();
+        ctx.strokeStyle = c;
+        ctx.beginPath();
+        ctx.moveTo(x * arX, y * arY);
+      })
+      socket.on('clearCanvas', function () {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+      })
+      canvas.addEventListener("touchstart", function (e) {
+      var touch = e.touches[0];
+      var mouseEvent = new MouseEvent("mousedown", {
+        clientX: touch.clientX,
+        clientY: touch.clientY
+      });
+      canvas.dispatchEvent(mouseEvent);
+    }, false);
+
+    formSubmit.addEventListener("click", joinGame);
+    trash.addEventListener("click", cleanCanvas);
+    textarea.addEventListener("keyup", sendMessage);
+    
+      canvas.addEventListener("touchend", function (e) {
+        var mouseEvent = new MouseEvent("mouseup", {});
+        canvas.dispatchEvent(mouseEvent);
+      }, false);
+      canvas.addEventListener("touchmove", function (e) {
+        var touch = e.touches[0];
+        var mouseEvent = new MouseEvent("mousemove", {
+          clientX: touch.clientX,
+          clientY: touch.clientY
+        });
+        canvas.dispatchEvent(mouseEvent);
+      }, false);
+    });
+  </script>
+</head>
+
+<body class="d-flex flex-row">
+  <div class="name d-flex w-100 position-absolute bg-white justify-content-center align-items-center h-100">
+    <div class="container w-50">
+      <form>
+        <div class="form-group">
+          <label for="name " class="h3 ">Podaj swoją nazwę użytkownika</label>
+          <input class="form-control" required type="text" id="name" autocomplete="off" placeholder="Aa" />
+        </div>
+        <button type="submit" class="btn btn-primary play w-100">Graj!</button>
+      </form>
+    </div>
+  </div>
+  <div class="canvas h-100 w-75 p-3 border ">
+    <div class="container paint h-100">
+      <div class='row w-100 h-10 d-none paintbar bg-light border  rounded text-center align-items-center'>
+        <div class='col col-sm-2 w-25'> Hasło: <span class="password"></span></div>
+        <div class='col col-sm-3 w-25'> Pozostały czas: <span class="time"></span></div>
+        <div class='col col-sm-2 w-25 '>
+          <div class="color"></div>
+        </div>
+        <div class='col col-sm-3 w-25 '><label for="brushSize">Rozmiar pędzla</label>
+          <input type="range" class="custom-range" value="3" min="1" max="10" id="brushSize"></div>
+        <div class='col col-sm-2 w-25 '><i class="las la-trash"></i></div>
+      </div>
+      <canvas id="canvas" class=""></canvas>
+    </div>
+  </div>
+  <div class="chat h-100 w-25">
+    <div class="container-fluid h-100 position-relative">
+      <div class="row h-25 border border-left-0 bg-light overflow-auto">
+        <div class="col col-sm-12 overflow-auto">
+          <table class="table table-hover table-sm overflow-auto">
+            <thead class=" border-top-0">
+              <tr>
+
+                <th scope="col">Gracz</th>
+                <th scope="col">Punkty</th>
+
+              </tr>
+            </thead>
+            <tbody class="points">
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="messages h-65 overflow-auto mh-65">
+
+      </div>
+
+      <div class="row h-10 w-100 border border-left-0  position-absolute bottom overflow-auto">
+        <div class="col col-sm-12 overflow-auto m-0 p-0">
+          <textarea class="message" placeholder="Odgadnij hasło"></textarea>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</body>
+
+</html>
