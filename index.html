@@ -109,6 +109,7 @@
         pbHeight = parseFloat(getComputedStyle(paintBar).height);
         canvas.width = width - 50;
         canvas.height = height - pbHeight - 50;
+        socket.emit('resize', true);
       });
 
       function changeBrushSize() {
@@ -235,7 +236,7 @@
 
       socket.on('winner', function(winner, pass)
       {
-        chat.innerHTML = `<div class="row w-100 bg-success"><div class="col col-sm-12"><p>Wygrywa ${winner}. Hasło to ${pass}</p></div></div>`;
+        chat.innerHTML = `<div class="row w-100 text-center"><div class="col col-sm-12"><p>Wygrywa <b>${winner}</b>. Hasło to <b>${pass}</b></p></div></div>`;
       })
       socket.on('canvasPause', function () {
         ctx.beginPath();

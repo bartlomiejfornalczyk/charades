@@ -33,7 +33,10 @@ io.on('connection', function (socket) {
       startNewGame(connectedUsers);
     }
   });
-
+  socket.on('resize', function()
+  {
+    io.to(`${socket.client.id}`).emit('drawHistory', drawHistory);
+  })
   socket.on('message', function (msg) {
 
     io.emit('message', msg);
@@ -65,9 +68,10 @@ io.on('connection', function (socket) {
 
   function choosePainter(cUsers, lastPainter) {
     let newPainter;
-    while (lastPainter == newPainter) {
+    do{
       newPainter = cUsers[Math.floor(Math.random() * cUsers.length)];
     }
+    while(newPainter == lastPainter)
     return newPainter;
 
   }
@@ -85,7 +89,9 @@ io.on('connection', function (socket) {
     startTimer(counter, painter.id);
     io.to(`${painter.id}`).emit("chosenOne", password);
   }
+  
   socket.on('clearCanvas', function () {
+    drawHistory = [];
     io.emit('clearCanvas', true);
   })
   socket.on('password', function (pass) {
@@ -132,11 +138,14 @@ io.on('connection', function (socket) {
   })
   socket.on('disconnect', function () {
     let index = connectedUsers.findIndex(user => user.id == socket.client.id);
-
     connectedUsers.splice(index, 1);
     if (connectedUsers.length < 2) {
       gameAlreadyStarted = false;
+      drawHistory = [];
+      io.emit('disablePaintBar', 'true');
+      clearInterval(intID);
       io.emit('clearCanvas', true);
+
     }
     io.emit('allUsers', connectedUsers);
   });
